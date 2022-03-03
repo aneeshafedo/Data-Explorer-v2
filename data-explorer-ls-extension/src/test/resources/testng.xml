@@ -1,0 +1,9 @@
+<!DOCTYPE suite SYSTEM "https://testng.org/testng-1.0.dtd" >
+
+<suite name="ballerina-test-suite">
+    <test name="choreo-dataexplorer-suite" preserve-order="true" parallel="false">
+        <classes>
+            <class name="io.choreo.dataexplorer.UnitTests"/>
+        </classes>
+    </test>
+</suite>

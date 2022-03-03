@@ -1,0 +1,18 @@
+[package]
+license = ["Apache-2.0"]
+org = "aneesha"
+name = "test_mysql"
+# distribution = "2201.0.0"
+version = "1.0.0"
+
+[build-options]
+observabilityIncluded = true
+
+# [[platform.java11.dependency]]
+# path = "/home/aneesha/Documents/Dev-Zone/data-explorer/v2/data-explorer/src/main/resources/mssql-jdbc-9.4.0.jre11.jar"
+
+# [dependencies]
+# [[platform.java11.dependency]]
+# groupId = "mysql"
+# artifactId = "mysql-connector-java"
+# version = "8.0.25"

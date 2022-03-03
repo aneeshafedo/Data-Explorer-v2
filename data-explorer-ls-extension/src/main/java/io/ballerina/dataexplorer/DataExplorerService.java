@@ -41,13 +41,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.StringJoiner;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
 
 import static io.ballerina.dataexplorer.DataExplorerConstants.SUCCESS;
@@ -79,16 +73,22 @@ public class DataExplorerService implements ExtendedLanguageServerService {
 
     //getQueryOutput
     @JsonNotification
-    public CompletableFuture<DataExplorerResponse> getResults(DataExplorerRequest request) throws Exception {
+    public CompletableFuture<DBQueryExexutionResponse> runDatabaseQuery (DBQueryExecutionRequest request) throws Exception {
         return CompletableFuture.supplyAsync(() -> {
-            DataExplorerResponse dataExplorerResponse = null;
+//            Properties props = System.getProperties();
+//            props.setProperty("ballerina.home", "/home/aneesha/Documents/Dev-Zone/ballerina-lang/ballerina-lang/distribution/zip/jballerina-tools/build/extracted-distributions/jballerina-tools-2201.0.1-SNAPSHOT");
+            DBQueryExexutionResponse dataExplorerResponse = null;
             try {
+                // Creates a new directory in the default temporary file directory.
+                this.tempProjectDir = Files.createTempDirectory(TEMP_DIR_PREFIX + System.currentTimeMillis());
+                this.tempProjectDir.toFile().deleteOnExit();
                 String mainBalFile = getMainFileContent(request);
-                BuildProject project = createProject(mainBalFile, request.getBallerinaTomlFilePath());
-                Path executablePath = createExecutables(project);
-                String result = executeJar(executablePath.toAbsolutePath().toString());
-                JSONArray jsonArr = new JSONArray(result);
-                dataExplorerResponse = new DataExplorerResponse(jsonArr);
+                BuildProject project = createProject(mainBalFile, request.getBallerinaTomlFilePath().getUri());
+//                Path executablePath = createExecutables(project);
+//                String result = executeJar(executablePath.toAbsolutePath().toString());
+//                JSONArray jsonArr = new JSONArray(result.replace("\n", ""));
+//                dataExplorerResponse = new DataExplorerResponse(jsonArr);
+                dataExplorerResponse = new DBQueryExexutionResponse(this.tempProjectDir.toAbsolutePath().toString());
             } catch (Exception e) {
                 LOGGER.error(e.getMessage());
             }
@@ -136,45 +136,62 @@ public class DataExplorerService implements ExtendedLanguageServerService {
         });
     }
 
-    private String executeJar(String executablePath) throws IOException, InterruptedException {
+    public String executeJar(String executablePath) throws IOException, InterruptedException {
         Process proc = Runtime.getRuntime().exec("java -jar " + executablePath);
         proc.waitFor();
-        // Then retreive the process output
         InputStream in = proc.getInputStream();
         byte[] b = new byte[in.available()];
-//        int read = in.read(b, 0, b.length);
-        return new String(b);
 
-//        InputStream err = proc.getErrorStream();
-//
-//        byte c[]=new byte[err.available()];
-//        err.read(c,0,c.length);
+        int read = in.read(b, 0, b.length);
+
+        InputStream err = proc.getErrorStream();
+
+        byte c[]=new byte[err.available()];
+        err.read(c,0,c.length);
+        String error = new String(c);
+        return new String(b);
 
     }
 
-    private String getMainFileContent(DataExplorerRequest request) throws IOException {
+    private String getMainFileContent(DBQueryExecutionRequest request) throws IOException {
         MustacheFactory mf = new DefaultMustacheFactory();
         Mustache mustache = mf.compile("template.main.mustache");
         Map<String, Object> context = new HashMap<>();
+        String dbType = request.getDbConfiguration().getDbType();
 
-        Collection<String> imports = new ArrayList<>();
-        if (request.getImportsList().size() > 0) {
-            for (String balImport : request.getImportsList()) {
-                imports.add(String.format("import %s;", balImport));
-            }
+        List<String> imports = new ArrayList<>();
+
+        switch (dbType){
+            case "mysql":
+                imports.addAll(Arrays.asList("import ballerinax/mysql;", "import ballerinax/mysql.driver as _;"));
+                break;
+            case "mssql":
+                imports.addAll(Arrays.asList("import ballerinax/mssql;"));
+
         }
+
+        imports.addAll(Arrays.asList("import ballerina/sql;", "import ballerina/io;"));
+
+
         Collection<String> variables = new ArrayList<>();
-        if (request.getVariables().size() > 0) {
-            request.getVariables().forEach(var -> variables.add(var + ";"));
+        if (request.getQueryParameterList().size() > 0) {
+            request.getQueryParameterList().forEach(var -> variables.add(var + ";"));
         }
 
         String clientInitiParams = "";
-        if (request.getParams().size() > 0) {
-            clientInitiParams = String.join(", " , request.getParams());
+        if (request.getDbConfiguration() != null) {
+            clientInitiParams = String.format("host = \"%s\", user = \"%s\", password = \"%s\", database = \"%s\", port = %s",
+                                                request.getDbConfiguration().getHost(),
+                                                request.getDbConfiguration().getUser(),
+                                                request.getDbConfiguration().getPassword(),
+                                                request.getDbConfiguration().getDatabase(),
+                                                request.getDbConfiguration().getPort()
+                                            );
+
         }
 
         BalProjectContext templateContext = new BalProjectContext(imports, clientInitiParams, variables,
-                request.getQueryString(), request.getClientType());
+                request.getDbConfiguration().getQuery(), request.getDbConfiguration().getDbType());
         context.put("mainBal", templateContext);
         StringWriter writer = new StringWriter();
 
@@ -190,9 +207,7 @@ public class DataExplorerService implements ExtendedLanguageServerService {
      */
     private BuildProject createProject(String mainBalContent, String tomlFilePath) throws DataExplorerException {
         try {
-            // Creates a new directory in the default temporary file directory.
-            this.tempProjectDir = Files.createTempDirectory(TEMP_DIR_PREFIX + System.currentTimeMillis());
-            this.tempProjectDir.toFile().deleteOnExit();
+
 
             // Creates a main file and writes the generated code snippet.
             createMainBalFile(mainBalContent);

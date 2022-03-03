@@ -6,19 +6,19 @@ import org.ballerinalang.langserver.commons.registration.BallerinaServerCapabili
  *
  */
 public class DataExplorerServerCapabilities extends BallerinaServerCapability {
-    private boolean getResults;
+    private boolean runDatabaseQuery;
     private boolean getRemoteFunctionCalls;
 
     public DataExplorerServerCapabilities() {
         super(DataExplorerConstants.CAPABILITY_NAME);
     }
 
-    public boolean isGetResults() {
-        return getResults;
+    public boolean isRunDatabaseQuery() {
+        return runDatabaseQuery;
     }
 
-    public void setGetResults(boolean getResults) {
-        this.getResults = getResults;
+    public void setRunDatabaseQuery(boolean runDatabaseQuery) {
+        this.runDatabaseQuery = runDatabaseQuery;
     }
 
     public boolean isGetRemoteFunctionCalls() {

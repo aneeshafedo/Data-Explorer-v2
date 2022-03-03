@@ -1,0 +1,29 @@
+{{#mainBal}}
+{{#importsList}}
+{{{.}}}
+{{/importsList}}
+
+public function main() returns error? {
+    record {}[] results = [];
+    boolean hasNext = true;
+    stream <record {}, sql:Error?> resultStream =  check __getQueryResults();
+    while hasNext {
+        record {| record {| anydata...; |} value; |}? next = check resultStream.next();
+        if next is record {| record {| anydata...; |} value; |} {
+            results.push(next.value);
+        } else {
+            break;
+        }
+    }
+    io:println(results);
+}
+
+function __getQueryResults() returns stream<record {}, sql:Error?>|error {
+    {{{clientType}}}:Client myClient = check new ({{{params}}});
+    {{#variableList}}
+    {{{.}}}
+    {{/variableList}}
+    stream<record {}, sql:Error?> queryResults = myClient->query(`{{{queryString}}}`);
+    return queryResults;
+}
+{{/mainBal}}

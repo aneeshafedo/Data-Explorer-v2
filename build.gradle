@@ -36,6 +36,7 @@ ext.stdlibUrlVersion = project.stdlibUrlVersion
 ext.stdlibXmldataVersion = project.stdlibXmldataVersion
 ext.jacocoVersion = project.jacocoVersion
 ext.puppycrawlCheckstyleVersion = "8.18"
+ext.mustacheJavaCompilerVersion = project.mustacheJavaCompilerVersion
 
 allprojects {
     group = 'io.ballerina'
