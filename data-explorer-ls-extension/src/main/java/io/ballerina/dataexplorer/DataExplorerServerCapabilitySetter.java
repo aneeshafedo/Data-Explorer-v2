@@ -15,7 +15,6 @@ public class DataExplorerServerCapabilitySetter extends BallerinaServerCapabilit
     @Override
     public Optional<DataExplorerServerCapabilities> build() {
         DataExplorerServerCapabilities capabilities = new DataExplorerServerCapabilities();
-        capabilities.setRunDatabaseQuery(true);
         capabilities.setGetRemoteFunctionCalls(true);
         return Optional.of(capabilities);
     }

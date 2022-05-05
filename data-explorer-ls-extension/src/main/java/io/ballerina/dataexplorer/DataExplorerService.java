@@ -1,65 +1,34 @@
 package io.ballerina.dataexplorer;
 
-import com.github.mustachejava.DefaultMustacheFactory;
-import com.github.mustachejava.Mustache;
-import com.github.mustachejava.MustacheFactory;
 import io.ballerina.compiler.api.SemanticModel;
 import io.ballerina.compiler.syntax.tree.SyntaxTree;
-import io.ballerina.dataexplorer.utils.BalProjectContext;
-import io.ballerina.dataexplorer.utils.DataExplorerUtils;
-import io.ballerina.projects.BuildOptions;
+import io.ballerina.dataexplorer.models.DataExplorerResponse;
+import io.ballerina.dataexplorer.nodevisitors.ConnectorFinder;
 import io.ballerina.projects.Document;
-import io.ballerina.projects.JBallerinaBackend;
-import io.ballerina.projects.JvmTarget;
 import io.ballerina.projects.Module;
-import io.ballerina.projects.PackageCompilation;
-import io.ballerina.projects.ProjectEnvironmentBuilder;
-import io.ballerina.projects.ProjectException;
-import io.ballerina.projects.directory.BuildProject;
-import io.ballerina.projects.environment.Environment;
-import io.ballerina.projects.environment.EnvironmentBuilder;
-import io.ballerina.projects.internal.model.Target;
-import io.ballerina.tools.diagnostics.DiagnosticSeverity;
-import io.ballerina.tools.text.LineRange;
 import org.ballerinalang.annotation.JavaSPIService;
 import org.ballerinalang.langserver.commons.service.spi.ExtendedLanguageServerService;
 import org.ballerinalang.langserver.commons.workspace.WorkspaceManager;
-import org.eclipse.lsp4j.Position;
-import org.eclipse.lsp4j.Range;
 import org.eclipse.lsp4j.jsonrpc.services.JsonNotification;
 import org.eclipse.lsp4j.jsonrpc.services.JsonSegment;
 import org.eclipse.lsp4j.services.LanguageServer;
-import org.json.JSONArray;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
-import java.io.File;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.StringWriter;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
 import static io.ballerina.dataexplorer.DataExplorerConstants.SUCCESS;
 
 /**
- * ..
+ * The extended service for the data explorer.
  */
 @JavaSPIService("org.ballerinalang.langserver.commons.service.spi.ExtendedLanguageServerService")
 @JsonSegment("dataExplorerService")
 public class DataExplorerService implements ExtendedLanguageServerService {
 
     private WorkspaceManager workspaceManager;
-    private Path tempProjectDir;
-    private static final String TEMP_DIR_PREFIX = "data-explorer-dir-";
-    public static final String BAL_TOML_FILE_NAME = "Ballerina.toml";
-    private static final String MAIN_FILE_PREFIX = "main-";
-    public static final String BAL_FILE_EXT = ".bal";
-    private static final Logger LOGGER = LoggerFactory.getLogger(DataExplorerService.class);
 
     @Override
     public void init(LanguageServer langServer, WorkspaceManager workspaceManager) {
@@ -71,248 +40,44 @@ public class DataExplorerService implements ExtendedLanguageServerService {
         return getClass();
     }
 
-    //getQueryOutput
+    //getDBClientRemoteFunctionCalls
     @JsonNotification
-    public CompletableFuture<DBQueryExexutionResponse> runDatabaseQuery (DBQueryExecutionRequest request) throws Exception {
+    public  CompletableFuture<List<DataExplorerResponse>> getRemoteFunctionCalls
+    (DataExplorerRequest request) {
         return CompletableFuture.supplyAsync(() -> {
-//            Properties props = System.getProperties();
-//            props.setProperty("ballerina.home", "/home/aneesha/Documents/Dev-Zone/ballerina-lang/ballerina-lang/distribution/zip/jballerina-tools/build/extracted-distributions/jballerina-tools-2201.0.1-SNAPSHOT");
-            DBQueryExexutionResponse dataExplorerResponse = null;
-            try {
-                // Creates a new directory in the default temporary file directory.
-                this.tempProjectDir = Files.createTempDirectory(TEMP_DIR_PREFIX + System.currentTimeMillis());
-                this.tempProjectDir.toFile().deleteOnExit();
-                String mainBalFile = getMainFileContent(request);
-                BuildProject project = createProject(mainBalFile, request.getBallerinaTomlFilePath().getUri());
-//                Path executablePath = createExecutables(project);
-//                String result = executeJar(executablePath.toAbsolutePath().toString());
-//                JSONArray jsonArr = new JSONArray(result.replace("\n", ""));
-//                dataExplorerResponse = new DataExplorerResponse(jsonArr);
-                dataExplorerResponse = new DBQueryExexutionResponse(this.tempProjectDir.toAbsolutePath().toString());
-            } catch (Exception e) {
-                LOGGER.error(e.getMessage());
-            }
-            return dataExplorerResponse;
-        });
-    }
-
-    @JsonNotification
-    public  CompletableFuture<List<DBOperationFinderResponse>> getRemoteFunctionCalls
-            (DBOperationFinderRequest request) {
-        return CompletableFuture.supplyAsync(() -> {
-            List<DBOperationFinderResponse> callFinderResponses = new ArrayList<>(); //give the length of the array list
+            List<DataExplorerResponse> finalDataExplorerResponses = new ArrayList<>();
             String fileUri = request.getDocumentIdentifier().getUri();
             Path path = Path.of(fileUri);
             Optional<SemanticModel> semanticModel = this.workspaceManager.semanticModel(path);
             Optional<Module> module = this.workspaceManager.module(path);
 
             if (semanticModel.isEmpty() || module.isEmpty()) {
-                return callFinderResponses;
+                return finalDataExplorerResponses;
             }
 
-            DBOperationFinder nodeVisitor = new DBOperationFinder();
+            ConnectorFinder nodeVisitor = new ConnectorFinder();
 
             Optional<Document> document = this.workspaceManager.document(path);
 
             if (document.isEmpty()) {
-                return callFinderResponses;
+                return finalDataExplorerResponses;
             }
 
             SyntaxTree syntaxTree = document.get().syntaxTree();
             syntaxTree.rootNode().accept(nodeVisitor);
-            List<CodeLensePos> connectorCallList = nodeVisitor.getConnectors();
 
-            for (CodeLensePos connectorCall : connectorCallList) {
-                LineRange range = connectorCall.getLineRange();
-                Range lineRange = new Range(new Position(range.startLine().line(), range.startLine().offset()),
-                        new Position(range.endLine().line(), range.endLine().offset()));
-                DBOperationFinderResponse response = new DBOperationFinderResponse();
-                response.setRemoteCallPos(lineRange);
-                response.setType(SUCCESS);
-                response.setMessage(SUCCESS);
-                callFinderResponses.add(response);
+            ConnectorFinder codeLensExpressionVisitor = new ConnectorFinder();
+            syntaxTree.rootNode().accept(codeLensExpressionVisitor);
+            List<DataExplorerResponse> dataExplorerResponses = codeLensExpressionVisitor.getDataExplorerResponses();
+            for (DataExplorerResponse dataExplorerResponse : dataExplorerResponses) {
+                dataExplorerResponse.setType(SUCCESS);
+                finalDataExplorerResponses.add(dataExplorerResponse);
             }
-            return callFinderResponses;
+
+            return finalDataExplorerResponses;
         });
     }
 
-    public String executeJar(String executablePath) throws IOException, InterruptedException {
-        Process proc = Runtime.getRuntime().exec("java -jar " + executablePath);
-        proc.waitFor();
-        InputStream in = proc.getInputStream();
-        byte[] b = new byte[in.available()];
 
-        int read = in.read(b, 0, b.length);
-
-        InputStream err = proc.getErrorStream();
-
-        byte c[]=new byte[err.available()];
-        err.read(c,0,c.length);
-        String error = new String(c);
-        return new String(b);
-
-    }
-
-    private String getMainFileContent(DBQueryExecutionRequest request) throws IOException {
-        MustacheFactory mf = new DefaultMustacheFactory();
-        Mustache mustache = mf.compile("template.main.mustache");
-        Map<String, Object> context = new HashMap<>();
-        String dbType = request.getDbConfiguration().getDbType();
-
-        List<String> imports = new ArrayList<>();
-
-        switch (dbType){
-            case "mysql":
-                imports.addAll(Arrays.asList("import ballerinax/mysql;", "import ballerinax/mysql.driver as _;"));
-                break;
-            case "mssql":
-                imports.addAll(Arrays.asList("import ballerinax/mssql;"));
-
-        }
-
-        imports.addAll(Arrays.asList("import ballerina/sql;", "import ballerina/io;"));
-
-
-        Collection<String> variables = new ArrayList<>();
-        if (request.getQueryParameterList().size() > 0) {
-            request.getQueryParameterList().forEach(var -> variables.add(var + ";"));
-        }
-
-        String clientInitiParams = "";
-        if (request.getDbConfiguration() != null) {
-            clientInitiParams = String.format("host = \"%s\", user = \"%s\", password = \"%s\", database = \"%s\", port = %s",
-                                                request.getDbConfiguration().getHost(),
-                                                request.getDbConfiguration().getUser(),
-                                                request.getDbConfiguration().getPassword(),
-                                                request.getDbConfiguration().getDatabase(),
-                                                request.getDbConfiguration().getPort()
-                                            );
-
-        }
-
-        BalProjectContext templateContext = new BalProjectContext(imports, clientInitiParams, variables,
-                request.getDbConfiguration().getQuery(), request.getDbConfiguration().getDbType());
-        context.put("mainBal", templateContext);
-        StringWriter writer = new StringWriter();
-
-        mustache.execute(writer, context).flush();
-        return writer.toString();
-    }
-
-    /**
-     * Creates and returns a 'BuildProject' instance which contains the given source snippet in the main file.
-     *
-     * @param mainBalContent Source file content to be used for generating the project
-     * @return Created Ballerina project
-     */
-    private BuildProject createProject(String mainBalContent, String tomlFilePath) throws DataExplorerException {
-        try {
-
-
-            // Creates a main file and writes the generated code snippet.
-            createMainBalFile(mainBalContent);
-            // Creates the Ballerina.toml file and writes the package meta information.
-            createBallerinaToml(tomlFilePath);
-
-            Path userHome = Paths.get("build").resolve("user-home"); // check if set earlier
-            Environment environment = EnvironmentBuilder.getBuilder().setUserHome(userHome).build();
-            ProjectEnvironmentBuilder projectEnvironmentBuilder = ProjectEnvironmentBuilder.getBuilder(environment);
-            BuildOptions buildOptions = BuildOptions.builder().setOffline(false).build(); // offline false or true
-
-            return BuildProject.load(projectEnvironmentBuilder, this.tempProjectDir, buildOptions);
-        } catch (Exception e) {
-            throw new DataExplorerException("Error occurred while creating a temporary evaluation project at: " +
-                    this.tempProjectDir + ", due to: " + e.toString());
-        }
-    }
-
-    /**
-     * Helper method to write a string source to a file.
-     *
-     * @param content Content to write to the file.
-     * @throws IOException If writing was unsuccessful.
-     */
-    private void createMainBalFile(String content) throws DataExplorerException, IOException {
-        File mainBalFile = File.createTempFile(MAIN_FILE_PREFIX, BAL_FILE_EXT, tempProjectDir.toFile());
-        mainBalFile.deleteOnExit();
-        DataExplorerUtils.writeToFile(mainBalFile, content);
-    }
-
-    /**
-     * Helper method to create a Ballerina.toml file with predefined content.
-     *
-     * @throws IOException If writing was unsuccessful.
-     */
-    private void createBallerinaToml(String balTomlFilePathStr) throws DataExplorerException, IOException {
-        Path ballerinaTomlPath = tempProjectDir.resolve(BAL_TOML_FILE_NAME);
-        File balTomlFile = Files.createFile(ballerinaTomlPath).toFile();
-        balTomlFile.deleteOnExit();
-
-        Path balTomlFilePath = Path.of(balTomlFilePathStr);
-        String balTomlContent = Files.readString(balTomlFilePath, StandardCharsets.US_ASCII);
-
-        DataExplorerUtils.writeToFile(balTomlFile, balTomlContent);
-    }
-
-//    private PackageCompilation compile(Project project) throws DataExplorerException {
-//        try {
-//            PackageCompilation pkgCompilation = project.currentPackage().getCompilation();
-//            validateForCompilationErrors(pkgCompilation);
-//            return pkgCompilation;
-//        } catch (ProjectException | DataExplorerException e) {
-//            throw new DataExplorerException("failed to create executables while evaluating expression: "
-//                    + e.getMessage());
-//        }
-//    }
-
-    /* Compilation methods */
-
-    /**
-     * Creates a Ballerina executable jar on the generated code snippet, in a temp directory.
-     *
-     * @param project build project instance
-     * @return path of the created executable JAR
-     */
-    private Path createExecutables(BuildProject project) throws DataExplorerException {
-        Target target;
-        try {
-            target = new Target(project.sourceRoot());
-        } catch (IOException | ProjectException e) {
-            throw new DataExplorerException("failed to resolve target path while evaluating expression: "
-                    + e.getMessage());
-        }
-
-        Path executablePath;
-        try {
-            executablePath = target.getExecutablePath(project.currentPackage()).toAbsolutePath().normalize();
-        } catch (IOException e) {
-            throw new DataExplorerException("failed to create executables while evaluating expression: "
-                    + e.getMessage());
-        }
-
-        try {
-            PackageCompilation pkgCompilation = project.currentPackage().getCompilation();
-            validateForCompilationErrors(pkgCompilation);
-            JBallerinaBackend jBallerinaBackend = JBallerinaBackend.from(pkgCompilation, JvmTarget.JAVA_11);
-            jBallerinaBackend.emit(JBallerinaBackend.OutputType.EXEC, executablePath);
-        } catch (ProjectException e) {
-            throw new DataExplorerException("failed to create executables while evaluating expression: "
-                    + e.getMessage());
-        }
-        return executablePath;
-    }
-
-    private void validateForCompilationErrors(PackageCompilation packageCompilation) throws DataExplorerException {
-        if (packageCompilation.diagnosticResult().hasErrors()) {
-            StringJoiner errors = new StringJoiner(System.lineSeparator());
-            errors.add("compilation error(s) found while creating executables for evaluation: ");
-            packageCompilation.diagnosticResult().errors().forEach(error -> {
-                if (error.diagnosticInfo().severity() == DiagnosticSeverity.ERROR) {
-                    errors.add(error.message());
-                }
-            });
-            throw new DataExplorerException(errors.toString());
-        }
-    }
 }
 
