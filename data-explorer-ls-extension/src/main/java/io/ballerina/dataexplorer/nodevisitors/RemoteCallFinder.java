@@ -11,10 +11,10 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- *
+ * This class visits the remote method call actions.
  */
-public class ConnectorFinder extends NodeVisitor {
-    List<DataExplorerResponse> dataExplorerResponses = new ArrayList<>();
+public class RemoteCallFinder extends NodeVisitor {
+    private List<DataExplorerResponse> dataExplorerResponses = new ArrayList<>();
 
     public List<DataExplorerResponse> getDataExplorerResponses() {
         return dataExplorerResponses;
@@ -22,18 +22,15 @@ public class ConnectorFinder extends NodeVisitor {
 
     @Override
     public void visit(RemoteMethodCallActionNode remoteMethodCallActionNode) {
-        String sourceCode = remoteMethodCallActionNode.toSourceCode();
-        String endpointName = sourceCode.split("->")[0];
-
         NonTerminalNode remoteMethodCallActionParentNode = remoteMethodCallActionNode.parent();
         if (remoteMethodCallActionParentNode instanceof VariableDeclarationNode) {
-            RemoteCallExpressionVisitor remoteCallExpressionVisitor = new RemoteCallExpressionVisitor(endpointName);
+            RemoteCallExpressionVisitor remoteCallExpressionVisitor = new RemoteCallExpressionVisitor();
             remoteMethodCallActionParentNode.accept(remoteCallExpressionVisitor);
             dataExplorerResponses.addAll(remoteCallExpressionVisitor.getDataExplorerResponses());
         }
         if (remoteMethodCallActionParentNode instanceof CheckExpressionNode) {
             NonTerminalNode variableDeclarationNode = remoteMethodCallActionParentNode.parent();
-            RemoteCallExpressionVisitor remoteCallExpressionVisitor = new RemoteCallExpressionVisitor(endpointName);
+            RemoteCallExpressionVisitor remoteCallExpressionVisitor = new RemoteCallExpressionVisitor();
             variableDeclarationNode.accept(remoteCallExpressionVisitor);
             dataExplorerResponses.addAll(remoteCallExpressionVisitor.getDataExplorerResponses());
         }

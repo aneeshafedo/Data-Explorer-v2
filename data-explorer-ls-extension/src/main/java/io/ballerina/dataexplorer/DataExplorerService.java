@@ -3,7 +3,9 @@ package io.ballerina.dataexplorer;
 import io.ballerina.compiler.api.SemanticModel;
 import io.ballerina.compiler.syntax.tree.SyntaxTree;
 import io.ballerina.dataexplorer.models.DataExplorerResponse;
-import io.ballerina.dataexplorer.nodevisitors.ConnectorFinder;
+import io.ballerina.dataexplorer.models.StatementsResponse;
+import io.ballerina.dataexplorer.nodevisitors.RemoteCallFinder;
+import io.ballerina.dataexplorer.nodevisitors.StatementsFinder;
 import io.ballerina.projects.Document;
 import io.ballerina.projects.Module;
 import org.ballerinalang.annotation.JavaSPIService;
@@ -40,35 +42,29 @@ public class DataExplorerService implements ExtendedLanguageServerService {
         return getClass();
     }
 
-    //getDBClientRemoteFunctionCalls
     @JsonNotification
-    public  CompletableFuture<List<DataExplorerResponse>> getRemoteFunctionCalls
-    (DataExplorerRequest request) {
+    public  CompletableFuture<List<DataExplorerResponse>> getRemoteFunctionCalls(DataExplorerRequest request) {
         return CompletableFuture.supplyAsync(() -> {
             List<DataExplorerResponse> finalDataExplorerResponses = new ArrayList<>();
             String fileUri = request.getDocumentIdentifier().getUri();
             Path path = Path.of(fileUri);
             Optional<SemanticModel> semanticModel = this.workspaceManager.semanticModel(path);
-            Optional<Module> module = this.workspaceManager.module(path);
 
+            Optional<Module> module = this.workspaceManager.module(path);
             if (semanticModel.isEmpty() || module.isEmpty()) {
                 return finalDataExplorerResponses;
             }
 
-            ConnectorFinder nodeVisitor = new ConnectorFinder();
-
             Optional<Document> document = this.workspaceManager.document(path);
-
             if (document.isEmpty()) {
                 return finalDataExplorerResponses;
             }
 
+            RemoteCallFinder remoteCallFinder = new RemoteCallFinder();
             SyntaxTree syntaxTree = document.get().syntaxTree();
-            syntaxTree.rootNode().accept(nodeVisitor);
+            syntaxTree.rootNode().accept(remoteCallFinder);
 
-            ConnectorFinder codeLensExpressionVisitor = new ConnectorFinder();
-            syntaxTree.rootNode().accept(codeLensExpressionVisitor);
-            List<DataExplorerResponse> dataExplorerResponses = codeLensExpressionVisitor.getDataExplorerResponses();
+            List<DataExplorerResponse> dataExplorerResponses = remoteCallFinder.getDataExplorerResponses();
             for (DataExplorerResponse dataExplorerResponse : dataExplorerResponses) {
                 dataExplorerResponse.setType(SUCCESS);
                 finalDataExplorerResponses.add(dataExplorerResponse);
@@ -78,6 +74,37 @@ public class DataExplorerService implements ExtendedLanguageServerService {
         });
     }
 
+    @JsonNotification
+    public  CompletableFuture<List<StatementsResponse>> getStatements(StatementsRequest request) {
+        return CompletableFuture.supplyAsync(() -> {
+            List<StatementsResponse> finalStatementsResponses = new ArrayList<>();
+            String fileUri = request.getDocumentIdentifier().getUri();
+            String remoteCallExpression = request.getRemoteCallExpression();
+            Path path = Path.of(fileUri);
+            Optional<SemanticModel> semanticModel = this.workspaceManager.semanticModel(path);
 
+            Optional<Module> module = this.workspaceManager.module(path);
+            if (semanticModel.isEmpty() || module.isEmpty()) {
+                return finalStatementsResponses;
+            }
+
+            Optional<Document> document = this.workspaceManager.document(path);
+            if (document.isEmpty()) {
+                return finalStatementsResponses;
+            }
+
+            StatementsFinder statementsFinder = new StatementsFinder(document.get(), remoteCallExpression);
+            SyntaxTree syntaxTree = document.get().syntaxTree();
+            syntaxTree.rootNode().accept(statementsFinder);
+
+            List<StatementsResponse> statementsResponses = statementsFinder.getStatementsResponses();
+            for (StatementsResponse statementsResponse : statementsResponses) {
+                statementsResponse.setType(SUCCESS);
+                finalStatementsResponses.add(statementsResponse);
+            }
+
+            return finalStatementsResponses;
+        });
+    }
 }
 

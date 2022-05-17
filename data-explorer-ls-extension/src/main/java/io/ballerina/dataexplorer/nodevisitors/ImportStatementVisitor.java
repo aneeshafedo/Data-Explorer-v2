@@ -6,39 +6,38 @@ import io.ballerina.compiler.syntax.tree.ImportPrefixNode;
 import io.ballerina.compiler.syntax.tree.NodeVisitor;
 import io.ballerina.compiler.syntax.tree.SeparatedNodeList;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 
 /**
- *
+ * This class visits the import statements.
  */
 public class ImportStatementVisitor extends NodeVisitor {
-    private final String importPrefix;
-    private String importStatement;
-    public ImportStatementVisitor(String importPrefix) {
-        this.importPrefix = importPrefix;
+    private final List<String> importPrefixes;
+    private List<String> importStatements = new ArrayList<>();
+
+    public ImportStatementVisitor(List<String> importPrefixes) {
+        this.importPrefixes = importPrefixes;
     }
 
-    public String getImportStatement() {
-        return importStatement;
-    }
-
-    public void setImportStatement(String importStatement) {
-        this.importStatement = importStatement;
+    public List<String> getImportStatements() {
+        return importStatements;
     }
 
     @Override
     public void visit(ImportDeclarationNode importDeclarationNode) {
-        String generatedImportPrefix;
+        String detectedImportPrefix = "";
         Optional<ImportPrefixNode> optionalImportPrefixNode = importDeclarationNode.prefix();
         if (optionalImportPrefixNode.isPresent()) {
             ImportPrefixNode importPrefixNode = optionalImportPrefixNode.get();
-            generatedImportPrefix = importPrefixNode.prefix().toString();
+            detectedImportPrefix = importPrefixNode.prefix().toString();
         } else {
             SeparatedNodeList<IdentifierToken> moduleNameNode = importDeclarationNode.moduleName();
-            generatedImportPrefix = moduleNameNode.get(moduleNameNode.separatorSize()).toString();
+            detectedImportPrefix = moduleNameNode.get(moduleNameNode.separatorSize()).toString();
         }
-        if (generatedImportPrefix.equals(this.importPrefix)) {
-            this.importStatement = importDeclarationNode.toSourceCode();
+        if (this.importPrefixes.contains(detectedImportPrefix)) {
+            this.importStatements.add(importDeclarationNode.toSourceCode().trim());
         }
     }
 }
