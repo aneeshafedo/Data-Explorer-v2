@@ -14,6 +14,7 @@ import java.util.Optional;
  * This class visits the import statements.
  */
 public class ImportStatementVisitor extends NodeVisitor {
+    private final List<String> dbConnectors = List.of("mysql", "mssql", "postgresql", "oracledb", "cdata.connect");
     private final List<String> importPrefixes;
     private List<String> importStatements = new ArrayList<>();
 
@@ -38,6 +39,9 @@ public class ImportStatementVisitor extends NodeVisitor {
         }
         if (this.importPrefixes.contains(detectedImportPrefix)) {
             this.importStatements.add(importDeclarationNode.toSourceCode().trim());
+            if (this.dbConnectors.contains(detectedImportPrefix)) {
+                this.importStatements.add("import ballerinax/" + detectedImportPrefix + ".driver as _;");
+            }
         }
     }
 }

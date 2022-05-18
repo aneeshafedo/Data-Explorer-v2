@@ -16,6 +16,7 @@ import java.util.List;
  * This class visits the remote method call expression to access the corresponding statements.
  */
 public class StatementsVisitor extends NodeVisitor {
+    private final List<String> dbConnectors = List.of("mysql", "mssql", "postgresql", "oracledb", "cdata.connect");
     private final Document document;
     private final String endpointName;
     private List<StatementsResponse> dataExplorerResponses = new ArrayList<>();
@@ -39,6 +40,7 @@ public class StatementsVisitor extends NodeVisitor {
         List<String> importStatements = new ArrayList<>();
         List<String> configurableDeclarations = new ArrayList<>();
         List<String> nonConfigurableDeclarations = new ArrayList<>();
+        boolean isDatabase = false;
 
         List<String> arguments = new ArrayList<>();
         List<String> importPrefixes = new ArrayList<>();
@@ -78,11 +80,19 @@ public class StatementsVisitor extends NodeVisitor {
         syntaxTree.rootNode().accept(nonConfigurableDeclarationsVisitor);
         nonConfigurableDeclarations.addAll(nonConfigurableDeclarationsVisitor.getNonConfigurableDeclarations());
 
+        // Find isDatabase
+        for (String importPrefix : importPrefixes) {
+            if (dbConnectors.contains(importPrefix)) {
+                isDatabase = true;
+                break;
+            }
+        }
+
         LineRange lineRange = variableDeclarationNode.lineRange();
         Range range = new Range(new Position(lineRange.startLine().line(), lineRange.startLine().offset()),
                 new Position(lineRange.endLine().line(), lineRange.endLine().offset()));
 
         dataExplorerResponses.add(new StatementsResponse(range, remoteCallExpression, typeDescriptor, bindingPattern,
-                initExpression, importStatements, configurableDeclarations, nonConfigurableDeclarations));
+                initExpression, importStatements, configurableDeclarations, nonConfigurableDeclarations, isDatabase));
     }
 }
