@@ -40,6 +40,7 @@ public class StatementsVisitor extends NodeVisitor {
         List<String> importStatements = new ArrayList<>();
         List<String> configurableDeclarations = new ArrayList<>();
         List<String> nonConfigurableDeclarations = new ArrayList<>();
+        List<String> definedTypeDefinitions = new ArrayList<>();
         boolean isDatabase = false;
 
         List<String> arguments = new ArrayList<>();
@@ -80,6 +81,14 @@ public class StatementsVisitor extends NodeVisitor {
         syntaxTree.rootNode().accept(nonConfigurableDeclarationsVisitor);
         nonConfigurableDeclarations.addAll(nonConfigurableDeclarationsVisitor.getNonConfigurableDeclarations());
 
+        // Find defined type definitions
+        TypedBindingPatternVisitor typedBindingPatternVisitor = new TypedBindingPatternVisitor();
+        variableDeclarationNode.accept(typedBindingPatternVisitor);
+        DefinedTypesVisitor definedTypesVisitor =
+                new DefinedTypesVisitor(typedBindingPatternVisitor.getDefinedTypeNames());
+        syntaxTree.rootNode().accept(definedTypesVisitor);
+        definedTypeDefinitions.addAll(definedTypesVisitor.getDefinedTypeDefinitions());
+
         // Find isDatabase
         for (String importPrefix : importPrefixes) {
             if (dbConnectors.contains(importPrefix)) {
@@ -93,6 +102,7 @@ public class StatementsVisitor extends NodeVisitor {
                 new Position(lineRange.endLine().line(), lineRange.endLine().offset()));
 
         dataExplorerResponses.add(new StatementsResponse(range, remoteCallExpression, typeDescriptor, bindingPattern,
-                initExpression, importStatements, configurableDeclarations, nonConfigurableDeclarations, isDatabase));
+                initExpression, importStatements, configurableDeclarations, nonConfigurableDeclarations,
+                definedTypeDefinitions, isDatabase));
     }
 }
