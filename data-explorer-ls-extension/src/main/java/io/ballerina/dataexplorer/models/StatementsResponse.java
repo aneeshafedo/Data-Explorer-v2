@@ -16,13 +16,14 @@ public class StatementsResponse {
     private List<String> importStatements;
     private List<String> configurableDeclarations;
     private List<String> nonConfigurableDeclarations;
+    private List<String> definedTypeDefinitions;
     private boolean isDatabase;
     private String type;
 
     public StatementsResponse(Range lineRange, String remoteCallExpression, String remoteCallTypeDescriptor,
                               String remoteCallBindingPattern, String initExpression, List<String> importStatements,
                               List<String> configurableDeclarations, List<String> nonConfigurableDeclarations,
-                              boolean isDatabase) {
+                              List<String> definedTypeDefinitions, boolean isDatabase) {
         this.lineRange = lineRange;
         this.remoteCallExpression = remoteCallExpression;
         this.remoteCallTypeDescriptor = remoteCallTypeDescriptor;
@@ -31,6 +32,7 @@ public class StatementsResponse {
         this.importStatements = importStatements;
         this.configurableDeclarations = configurableDeclarations;
         this.nonConfigurableDeclarations = nonConfigurableDeclarations;
+        this.definedTypeDefinitions = definedTypeDefinitions;
         this.isDatabase = isDatabase;
     }
 
@@ -96,6 +98,14 @@ public class StatementsResponse {
 
     public void setNonConfigurableDeclarations(List<String> nonConfigurableDeclarations) {
         this.nonConfigurableDeclarations = nonConfigurableDeclarations;
+    }
+
+    public List<String> getDefinedTypeDefinitions() {
+        return definedTypeDefinitions;
+    }
+
+    public void setDefinedTypeDefinitions(List<String> definedTypeDefinitions) {
+        this.definedTypeDefinitions = definedTypeDefinitions;
     }
 
     public boolean isDatabase() {
