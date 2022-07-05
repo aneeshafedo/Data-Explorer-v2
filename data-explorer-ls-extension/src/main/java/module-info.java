@@ -8,4 +8,5 @@ module io.ballerina.dataexplorer.dataExplorerService {
     requires io.ballerina.tools.api;
     requires json;
     requires compiler;
+    requires com.google.gson;
 }

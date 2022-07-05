@@ -106,5 +106,31 @@ public class DataExplorerService implements ExtendedLanguageServerService {
             return finalStatementsResponses;
         });
     }
+
+//    @JsonRequest
+//    public CompletableFuture<PackageConfigSchemaResponse> configSchema(DataExplorerRequest request) {
+//        return CompletableFuture.supplyAsync(() -> {
+//            PackageConfigSchemaResponse response = new PackageConfigSchemaResponse();
+//            try {
+//                List<DataExplorerResponse> finalDataExplorerResponses = new ArrayList<>();
+//                String fileUri = request.getDocumentIdentifier().getUri();
+//                Path path = Path.of(fileUri);
+//
+////                Optional<Project> project = this.workspaceManager.project(filePath.get());
+////                if (project.isEmpty()) {
+////                    throw new UserErrorException("Project not found.");
+////                }
+//                Project project = ProjectLoader.loadProject(path);
+//                Package currentPackage = project.currentPackage();
+//                response.setConfigSchema(new ConfigSchemaBuilder().getConfigSchemaContent(
+//                        ConfigReader.getConfigVariables(currentPackage)));
+//            } catch (Exception e) {
+//                String msg = "Operation 'ballerinaPackage/configSchema' failed!";
+////                this.clientLogger.logError(PackageContext.PACKAGE_CONFIG_SCHEMA, msg, e,
+////                        request.getDocumentIdentifier(), (Position) null);
+//            }
+//            return response;
+//        });
+//    }
 }
 
